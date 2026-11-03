@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Онлайн Мессенджер</title>
+<style>
+  :root { --bg:#0b1220; --side:#0f172a; --top:#0b1220; --brd:#1e293b; --txt:#e2e8f0; --mut:#64748b; --inp:#0f172a; --them:#1e293b; --mine:#3b82f6; }
+  [data-theme="light"] { --bg:#f1f5f9; --side:#ffffff; --top:#f8fafc; --brd:#e2e8f0; --txt:#1e293b; --mut:#94a3b8; --inp:#ffffff; --them:#e2e8f0; --mine:#3b82f6; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--txt);height:100vh;overflow:hidden;font-size:14px}
+  .hidden{display:none!important}
+  button{cursor:pointer;border:none;border-radius:9px;padding:9px 14px;font-weight:600;background:#3b82f6;color:#fff}
+  button.ghost{background:var(--brd);color:var(--txt)}
+  button.danger{background:#ef4444}
+  button.mini{padding:5px 9px;font-size:12px}
+  input{width:100%;font-family:inherit;padding:10px;border-radius:9px;border:1px solid var(--brd);background:var(--inp);color:var(--txt);outline:none}
+  input:focus{border-color:#3b82f6}
+  
+  #toast{position:fixed;top:15px;left:50%;transform:translateX(-50%) translateY(-100px);background:#3b82f6;color:#fff;padding:12px 20px;border-radius:10px;font-weight:600;z-index:9999;transition:.3s;cursor:pointer}
+  #toast.show{transform:translateX(-50%) translateY(0)}
+
+  #auth{display:flex;align-items:center;justify-content:center;height:100vh;padding:20px}
+  .auth-box{background:var(--side);border:1px solid var(--brd);border-radius:18px;padding:30px;width:100%;max-width:400px}
+  h1{font-size:24px;margin-bottom:15px}
+  .grp{margin-bottom:12px}
+  .grp label{display:block;font-size:12px;color:var(--mut);margin-bottom:5px}
+
+  #app{display:flex;flex-direction:column;height:100vh}
+  #sidebar{flex:1;display:flex;flex-direction:column;background:var(--side)}
+  .top{padding:14px;border-bottom:1px solid var(--brd);display:flex;gap:10px;align-items:center;background:var(--top)}
+  .av{width:40px;height:40px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;overflow:hidden;flex-shrink:0}
+  .av img{width:100%;height:100%;object-fit:cover}
+  .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .handle{font-size:12px;color:var(--mut)}
+  
+  .find{padding:10px;border-bottom:1px solid var(--brd);display:flex;gap:5px}
+  .find input{flex:1;padding:8px}
+  .cap{padding:10px;font-size:11px;color:var(--mut);text-transform:uppercase;font-weight:700}
+  .scroll{flex:1;overflow-y:auto}
+  .row{padding:10px;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--brd);cursor:pointer}
+  .row:hover{background:var(--brd)}
+  .info{flex:1;min-width:0}
+  
+  .badge{background:#f59e0b;color:#0b1220;font-size:12px;font-weight:bold;padding:2px 8px;border-radius:10px}
+
+  #chatView{flex:1;display:flex;flex-direction:column;background:var(--bg)}
+  .chat-top{padding:12px;border-bottom:1px solid var(--brd);display:flex;gap:10px;align-items:center;background:var(--top)}
+  .back{background:var(--brd);color:var(--txt);font-size:20px;padding:5px 10px;border-radius:8px}
+  
+  .feed{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+  .msg{max-width:85%;padding:10px 14px;border-radius:16px;font-size:14.5px;line-height:1.4;word-wrap:break-word}
+  .msg.them{align-self:flex-start;background:var(--them);border-bottom-left-radius:4px}
+  .msg.mine{align-self:flex-end;background:var(--mine);color:#fff;border-bottom-right-radius:4px}
+
+  .write{padding:12px;border-top:1px solid var(--brd);display:flex;gap:8px;background:var(--top)}
+  .write input{flex:1}
+
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
+  .sheet{background:var(--side);border:1px solid var(--brd);border-radius:16px;padding:24px;width:100%;max-width:400px}
+  .actions{display:flex;gap:8px;margin-top:15px}
+  .actions button{flex:1}
+</style>
+</head>
+<body>
+
+<div id="toast" onclick="openChatFromToast()"><span id="toastText"></span></div>
+
+<div id="auth">
+  <div class="auth-box">
+    <h1>Вход</h1>
+    <div class="grp"><label>Имя</label><input id="lName" placeholder="Имя"></div>
+    <div class="grp"><label>Юзернейм (ID)</label><input id="lUser" placeholder="doxr38"></div>
+    <button id="bLogin" style="width:100%">Войти в сеть</button>
+    <p style="color:#f87171;margin-top:10px" id="authMsg"></p>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <div id="sidebar">
+    <div class="top">
+      <div class="av" id="myAv"></div>
+      <div style="flex:1;min-width:0"><div class="name" id="myNm"></div><div class="handle" id="myTg"></div></div>
+      <button class="ghost mini" id="bProf">✎</button>
+      <button class="ghost mini" id="bAcc">👥</button>
+    </div>
+    <div class="find">
+      <input id="q" placeholder="Введите ID друга">
+      <button class="mini" id="bFind">Найти</button>
+    </div>
+    <div class="cap">Чаты</div>
+    <div class="scroll" id="fr"></div>
+  </div>
+
+  <div id="chatView" class="hidden">
+    <div class="chat-top">
+      <button class="back" onclick="closeChat()">←</button>
+      <div class="av" id="cAv"></div>
+      <div style="flex:1;min-width:0"><div class="name" id="cNm"></div><div class="handle" style="color:#10b981">в сети</div></div>
+    </div>
+    <div class="feed" id="msgs"></div>
+    <div class="write">
+      <input id="text" placeholder="Сообщение...">
+      <button id="bSend">➤</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="prof">
+  <div class="sheet">
+    <h2>Профиль</h2>
+    <div class="grp"><label>Аватар (URL)</label><input id="pAv" placeholder="https://..."></div>
+    <div class="grp"><label>Имя</label><input id="pNm"></div>
+    <div class="actions" style="margin-bottom:10px"><button id="bTheme" class="ghost" style="width:100%">🌗 Тема</button></div>
+    <div class="actions"><button class="ghost" id="pCancel">Отмена</button><button id="pSave">Сохранить</button></div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="accModal">
+  <div class="sheet">
+    <h2>Аккаунты</h2>
+    <div class="scroll" id="accList" style="max-height:300px;margin-bottom:15px"></div>
+    <div class="actions" style="margin-bottom:10px"><button id="accNew" style="background:#10b981">+ Добавить</button></div>
+    <div class="actions"><button class="ghost" onclick="document.getElementById('accModal').classList.add('hidden')">Закрыть</button></div>
+  </div>
+</div>
+
+<script>
+  const DB_URL = "https://doxr-a0b02-default-rtdb.firebaseio.com/";
+  let me = null, activeId = null, usersList = [], msgsList = [], lastCount = 0;
+  const $ = id => document.getElementById(id);
+  let savedAccs = JSON.parse(localStorage.getItem('savedAccs') || '[]');
+  let theme = localStorage.getItem('m_theme') || 'dark';
+
+  if (theme === 'light') document.body.setAttribute('data-theme', 'light');
+  $('bTheme').onclick = () => {
+    theme = theme === 'dark' ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', theme === 'light' ? 'light' : '');
+    localStorage.setItem('m_theme', theme);
+  };
+
+  // ВХОД
+  $('bLogin').onclick = () => {
+    const name = $('lName').value.trim();
+    const id = $('lUser').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
+    if(!name || !id) return $('authMsg').textContent = 'Заполни поля!';
+    
+    me = {id: id, name: name, avatar: ''};
+    fetch(DB_URL + "users/" + id + ".json", { method: 'PUT', body: JSON.stringify(me) })
+    .then(() => {
+      if(!savedAccs.find(a => a.id === id)) {
+        savedAccs.push(me); localStorage.setItem('savedAccs', JSON.stringify(savedAccs));
+      }
+      $('auth').classList.add('hidden'); $('app').classList.remove('hidden');
+      $('myNm').textContent = me.name; $('myTg').textContent = '@' + me.id; $('myAv').textContent = me.name[0];
+      startSync();
+    });
+  };
+
+  // СИНХРОНИЗАЦИЯ
+  function startSync() {
+    setInterval(() => {
+      fetch(DB_URL + "messages.json").then(r => r.json()).then(data => {
+        msgsList = [];
+        if(data) {
+          Object.keys(data).forEach(key => {
+            let m = data[key]; m.key = key; msgsList.push(m);
+          });
+        }
+        msgsList.sort((a,b) => a.ts - b.ts);
+        
+        if(msgsList.length > lastCount) {
+          if(lastCount !== 0) beep();
+          lastCount = msgsList.length;
+          renderMsgs();
+          renderChatsList();
+        }
+      });
+    }, 1500);
+  }
+
+  function renderChatsList() {
+    let activeChats = [];
+    msgsList.forEach(m => {
+      if(m.from === me.id) activeChats.push(m.to);
+      if(m.to === me.id) activeChats.push(m.from);
+    });
+    activeChats = [...new Set(activeChats)];
+
+    let html = '';
+    activeChats.forEach(id => {
+      if(id === me.id) return;
+      let unread = msgsList.filter(m => m.from === id && m.to === me.id && !m.read).length;
+      let badge = unread > 0 ? `<div class="badge">${unread}</div>` : '';
+      
+      let user = usersList.find(u => u.id === id) || {name: id, avatar: ''};
+      let av = user.avatar ? `<img src="${user.avatar}">` : user.name[0];
+      
+      html += `<div class="row" onclick="openChat('${id}')">
+        <div class="av">${av}</div>
+        <div class="info"><div class="name">${user.name}</div><div class="handle">@${id}</div></div>
+        ${badge}
+      </div>`;
+    });
+    $('fr').innerHTML = html || '<div style="text-align:center;padding:20px;color:#64748b">Нет активных чатов.<br>Найдите друга через поиск сверху.</div>';
+  }
+
+  // ПОИСК (ИСПРАВЛЕН, БЕЗ ЛОЖНЫХ ОШИБОК)
+  $('bFind').onclick = () => {
+    let q = $('q').value.trim().toLowerCase().replace(/^@/,'');
+    if(!q) return;
+    
+    $('fr').innerHTML = '<div style="text-align:center;padding:20px;color:#64748b">Поиск...</div>';
+    
+    fetch(DB_URL + "users/" + q + ".json").then(r => r.json()).then(data => {
+      if(data && data.id) {
+        let u = data;
+        let av = u.avatar ? `<img src="${u.avatar}">` : u.name[0];
+        $('fr').innerHTML = `<div class="row" onclick="openChat('${u.id}')">
+          <div class="av">${av}</div>
+          <div class="info"><div class="name">${u.name}</div><div class="handle">@${u.id}</div></div>
+        </div>`;
+      } else {
+        $('fr').innerHTML = '<div style="text-align:center;padding:20px;color:#f87171">Пользователь не найден!<br>Проверьте ID или пусть друг зайдет в приложение.</div>';
+      }
+    }).catch(e => {
+      $('fr').innerHTML = '<div style="text-align:center;padding:20px;color:#f87171">Ошибка соединения с базой.</div>';
+    });
+  };
+
+  window.openChat = (id) => {
+    activeId = id;
+    $('sidebar').classList.add('hidden');
+    $('chatView').classList.remove('hidden');
+    $('cNm').textContent = id;
+    $('cAv').textContent = id[0].toUpperCase();
+
+    fetch(DB_URL + "users/" + id + ".json").then(r => r.json()).then(data => {
+      if(data) {
+        $('cNm').textContent = data.name;
+        if(data.avatar) $('cAv').innerHTML = `<img src="${data.avatar}">`;
+      }
+    });
+
+    let updates = {};
+    msgsList.forEach(m => {
+      if(m.from === id && m.to === me.id && !m.read) updates[m.key + "/read"] = true;
+    });
+    if(Object.keys(updates).length > 0) fetch(DB_URL + "messages.json", {method:'PATCH', body:JSON.stringify(updates)});
+    renderMsgs();
+  };
+
+  window.closeChat = () => {
+    activeId = null;
+    $('chatView').classList.add('hidden');
+    $('sidebar').classList.remove('hidden');
+    $('q').value = '';
+    renderChatsList();
+  };
+
+  function renderMsgs() {
+    if(!activeId) return;
+    let thread = msgsList.filter(m => (m.from === me.id && m.to === activeId) || (m.from === activeId && m.to === me.id));
+    if(thread.length === 0) { $('msgs').innerHTML = '<div style="text-align:center;padding:20px;color:#64748b">Нет сообщений</div>'; return; }
+    
+    $('msgs').innerHTML = thread.map(m => `
+      <div class="msg ${m.from === me.id ? 'mine' : 'them'}">
+        ${m.text}
+        <span style="display:block;font-size:10px;opacity:.7;margin-top:4px;text-align:right">${new Date(m.ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</span>
+      </div>
+    `).join('');
+    $('msgs').scrollTop = $('msgs').scrollHeight;
+  }
+
+  $('bSend').onclick = () => {
+    let text = $('text').value.trim();
+    if(!text || !activeId) return;
+    fetch(DB_URL + "messages.json", {
+      method: 'POST', body: JSON.stringify({from: me.id, to: activeId, text: text, ts: Date.now(), read: false})
+    }).then(() => $('text').value = '');
+  };
+  $('text').onkeydown = (e) => { if(e.key === 'Enter') $('bSend').click(); };
+
+  // ПРОФИЛЬ
+  $('bProf').onclick = () => { $('pNm').value = me.name; $('pAv').value = me.avatar || ''; $('prof').classList.remove('hidden'); };
+  $('pCancel').onclick = () => $('prof').classList.add('hidden');
+  $('pSave').onclick = () => {
+    me.name = $('pNm').value.trim();
+    me.avatar = $('pAv').value.trim();
+    fetch(DB_URL + "users/" + me.id + ".json", {method:'PUT', body:JSON.stringify(me)}).then(() => {
+      $('myNm').textContent = me.name;
+      if(me.avatar) $('myAv').innerHTML = `<img src="${me.avatar}">`;
+      $('prof').classList.add('hidden');
+    });
+  };
+
+  // АККАУНТЫ
+  $('bAcc').onclick = () => {
+    let html = '';
+    savedAccs.forEach(u => {
+      let cur = u.id === me.id;
+      let av = u.avatar ? `<img src="${u.avatar}">` : u.name[0];
+      html += `<div class="row" style="border:1px solid ${cur?'#3b82f6':'transparent'}">
+        <div class="av" onclick="switchAcc('${u.id}')">${av}</div>
+        <div class="info" onclick="switchAcc('${u.id}')"><div class="name">${u.name} ${cur?'(Вы)':''}</div><div class="handle">@${u.id}</div></div>
+        <button class="danger mini" onclick="delAcc('${u.id}')">✖</button>
+      </div>`;
+    });
+    $('accList').innerHTML = html;
+    $('accModal').classList.remove('hidden');
+  };
+
+  window.switchAcc = (id) => {
+    let a = savedAccs.find(x => x.id === id);
+    if(!a) return;
+    me = a; $('accModal').classList.add('hidden');
+    $('myNm').textContent = me.name; $('myTg').textContent = '@' + me.id; $('myAv').textContent = me.name[0];
+    if(me.avatar) $('myAv').innerHTML = `<img src="${me.avatar}">`;
+    closeChat(); msgsList = []; lastCount = 0;
+  };
+
+  window.delAcc = (id) => {
+    if(!confirm('Удалить?')) return;
+    savedAccs = savedAccs.filter(a => a.id !== id);
+    localStorage.setItem('savedAccs', JSON.stringify(savedAccs));
+    if(me.id === id) {
+      if(savedAccs.length > 0) { me = savedAccs[0]; switchAcc(me.id); }
+      else { me = null; $('app').classList.add('hidden'); $('auth').classList.remove('hidden'); }
+    }
+    $('bAcc').click();
+  };
+
+  $('accNew').onclick = () => { $('accModal').classList.add('hidden'); $('app').classList.add('hidden'); $('auth').classList.remove('hidden'); };
+
+  let tTimer = null, tId = null;
+  function showToast(n, id) {
+    tId = id; $('toastText').textContent = 'Сообщение от ' + n;
+    $('toast').classList.add('show');
+    if(tTimer) clearTimeout(tTimer);
+    tTimer = setTimeout(() => $('toast').classList.remove('show'), 4000);
+  }
+  window.openChatFromToast = () => { if(tId) { $('toast').classList.remove('show'); window.openChat(tId); } };
+  function beep() {
+    try {
+      let ctx = new (window.AudioContext || window.webkitAudioContext)();
+      let osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.connect(g); g.connect(ctx.destination);
+      osc.frequency.value = 800; g.gain.value = 0.1;
+      osc.start(); osc.stop(ctx.currentTime + 0.1);
+    } catch(e){}
+  }
+</script>
+</body>
+</html>
